@@ -1,0 +1,5 @@
+/OutputJSONs/*
+/SourceJSONs/*
+/bin
+/obj
+/.vs

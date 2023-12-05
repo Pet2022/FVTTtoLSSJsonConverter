@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32106.194
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FVTTtoLSSCharConverter", "FVTTtoLSSCharConverter.csproj", "{4868AA88-861F-45AE-AB5F-AC2ABD36EC94}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4868AA88-861F-45AE-AB5F-AC2ABD36EC94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4868AA88-861F-45AE-AB5F-AC2ABD36EC94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4868AA88-861F-45AE-AB5F-AC2ABD36EC94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4868AA88-861F-45AE-AB5F-AC2ABD36EC94}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9CB0482F-67A3-419C-855B-BF3E3167B303}
+	EndGlobalSection
+EndGlobal
