@@ -151,13 +151,23 @@ namespace FVTTtoLSSCharConverter {
 			return result;
 		}
 
-		public List<CharacterClassData> GetCastClasses() {
+		public List<CharacterClassData> GetCastClassesList() {
 			List<CharacterClassData> result = new List<CharacterClassData>();
 
 			foreach (CharacterClassData cData in classes.Values) {
 				if (cData.HasSpellAbility) {
 					result.Add(cData);
 				}
+			}
+
+			return result;
+		}
+
+		public List<CharacterClassData> GetAllClassesList() {
+			List<CharacterClassData> result = new List<CharacterClassData>();
+
+			foreach (CharacterClassData cData in classes.Values) {
+				result.Add(cData);
 			}
 
 			return result;
@@ -169,13 +179,14 @@ namespace FVTTtoLSSCharConverter {
 		public int classLevel = 1;
 		public string classNameOriginal;
 		public string className;
+		public string subclassName;
 		public string hitDice = "d6";
 		public int hitDiceValue = 6;
 		public List<int> lvlsHP = new List<int>();
 		public List<string> saves = new List<string>();
 
 		public bool HasSpellAbility {
-			get { return (spellcastCharacteristic != ""); }
+			get { return (spellcastCharacteristic != "none"); }
 		}
 		public string spellcastCharacteristic = "none";
 		public int spellSave = 0;
@@ -207,9 +218,29 @@ namespace FVTTtoLSSCharConverter {
 		public string GetCasterClassString() {
 			return className + " " + classLevel + " | Хар-ка: " + Localization.LocalizeCharacteristic(spellcastCharacteristic) + " | Спас: " + spellSave + " | Бонус: " + spellAttackBonus;
 		}
+
+		public string GetClassString() {
+			return className + " " + classLevel;
+		}
 	}
 
 	public static class Localization {
+
+		private static Dictionary<string, string> _classes = new Dictionary<string, string>(){
+			{ "bard", "Бард" },
+			{ "barbarian", "Варвар" },
+			{ "cleric", "Жрец" },
+			{ "druid", "Друид" },
+			{ "fighter", "Воин" },
+			{ "monk", "Монах" },
+			{ "paladin", "Паладин" },
+			{ "ranger", "Следопыт" },
+			{ "rogue", "Плут" },
+			{ "sorcerer", "Чародей" },
+			{ "warlock", "Колдун" },
+			{ "wizard", "Волшебник" },
+			{ "artificer", "Изобретатель" },
+		};
 
 		private static Dictionary<string, string> _characteristics = new Dictionary<string, string>(){
 			{ "str", "СИЛ" },
@@ -393,6 +424,7 @@ namespace FVTTtoLSSCharConverter {
 			{ "halfling", "Полуросликов" },
 			{ "elvish", "Эльфийский" },
 
+			{ "primordial", "Первичный" },
 			{ "auran", "Ауран" },
 			{ "ignan", "Игнан" },
 			{ "aquan", "Акван" },
@@ -415,6 +447,7 @@ namespace FVTTtoLSSCharConverter {
 		private static Dictionary<string, string> _misc = new Dictionary<string, string>(){
 			{ "sr", "короткий отдых" },
 			{ "lr", "долгий отдых" },
+			{ "day", "день" },
 		};
 
 		public static string LocalizeMisc(string key) {
@@ -425,6 +458,21 @@ namespace FVTTtoLSSCharConverter {
 			}
 
 			return _misc[key];
+		}
+
+		public static string LocalizeClass(string key) {
+			Utilities.AddLog("LocalizeClass: " + key);
+
+			if (string.IsNullOrEmpty(key)) {
+				return "";
+			}
+
+			// If need to translate
+			if(_classes.ContainsKey(key)){
+				return _classes[key];
+			}
+
+			return key;
 		}
 
 		public static string LocalizeCharacteristic(string key) {

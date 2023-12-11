@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace FVTTtoLSSCharConverter {
 	class Program {
-		private static string appVersion = "v1.0.0";
+		private static string appVersion = "v1.0.1";
 
 		private static string sourceJSONsFolder = "SourceJSONs";
 		private static string outputJSONsFolder = "OutputJSONs";
@@ -70,84 +70,147 @@ namespace FVTTtoLSSCharConverter {
 		}
 
 		private static void FVTTtoLSSConvert(string uniqueName, dynamic fvttObject) {
-			string dndSystemVersion = fvttObject._stats.systemVersion.ToString();
-			Utilities.AddLog("DND System Version: " + dndSystemVersion);
-
 			// Disable debug outputs
 			Utilities.doSilent = true;
 
-			Character fvttCharacter = new Character();
+			string dndSystemVersion = fvttObject._stats.systemVersion.ToString();
+			Utilities.AddLog("DND System Version: " + dndSystemVersion, true);
 
-			JToken[] characterClassesEnNames = JsonHelper.SearchTargetKeysByValue(fvttObject, "source", "class");
-			JToken[] characterClassesRuNames = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "class");
-			JToken[] characterClassesLevels = JsonHelper.SearchTargetKeysByValue(fvttObject, "levels", "class");
-			JToken[] characterClassesHitPoints = JsonHelper.SearchTargetKeysByValue(fvttObject, "value", "HitPoints");
-			JToken[] characterClassesHitDice = JsonHelper.SearchTargetKeysByName(fvttObject, "hitDice");
-			JToken[] characterClassesSpellcasting = JsonHelper.SearchTargetKeysByValue(fvttObject, "spellcasting", "class");
-			JToken[] characterClassesSaves;
-			if (dndSystemVersion != "2.4.0") {
-				characterClassesSaves = JsonHelper.SearchTargetKeysByName(fvttObject, "saves");
-			} else {
-				characterClassesSaves = JsonHelper.SearchTargetKeysByValue(fvttObject, "grants", "Trait");
+			// Find class, subclass and features imported from plutonium
+			//JToken[] plutoniumItems = JsonHelper.SearchTargetKeysByName(fvttObject, "plutonium");
+			//Utilities.AddLog("Plutonium items found count: " + plutoniumItems.Length, true);
+
+			//bool plutoniumUsed = false;
+			//foreach(var item in plutoniumItems){
+			//	dynamic plutoniumItem = (dynamic)item;
+			//	if (plutoniumItem.page != null && !string.IsNullOrEmpty(plutoniumItem.page.ToString())){
+			//		//Utilities.AddLog("Plutonium item with reference: " + plutoniumItem.page.ToString());
+			//		plutoniumUsed = true;
+			//	}	
+			//}
+
+			//Utilities.AddLog("Plutonium used: " + plutoniumUsed, true);
+
+			// Find all class items with hitDice values
+			JToken[] hitDiceTokens = JsonHelper.SearchTargetKeysByName(fvttObject, "hitDice");
+
+			//Utilities.AddLog("hitDiceTokens[0]: " + hitDiceTokens[0].ToString());
+			//Utilities.AddLog("hitDiceTokens[0].Root.SelectToken(\"items\").[0]: " + hitDiceTokens[0].Root.SelectToken("items")[0].ToString());
+
+			// Foreach hitDice token get class token
+			JToken[] classTokens = new JToken[hitDiceTokens.Length];
+			for(int i = 0; i < hitDiceTokens.Length; i++){
+				classTokens[i] = hitDiceTokens[i].Parent.Parent.Parent.Parent;
+				//Utilities.AddLog("classTokens " + i + "\n" + classTokens[i], true);
 			}
 
+			//Utilities.doSilent = true;
+
+			Character fvttCharacter = new Character();
+			string baseClassName = JsonHelper.SearchTargetKeyByValue(fvttObject, "name", fvttObject.system.details.originalClass.ToString());
 			bool isBase = false;
 			CharacterClassData cData;
-			for (int i = 0; i < characterClassesRuNames.Length; i++) {
-				//Utilities.AddLog("==========================================Character Classes HitPoints:\n" + characterClassesHitPoints[i]);
-				if (characterClassesHitPoints[i]["1"].ToString() == "max"){
-					isBase = true;
-				}else{
-					isBase = false;	
+			dynamic tmpClass;
+			JToken classSaves = null;
+			JToken classHitPoints = null;
+			JToken[] classHitPointsTmp;
+			int hpIntValue = 0;
+			string saveString = "";
+
+			for (int i = 0; i < classTokens.Length; i++) {
+				tmpClass = (dynamic)classTokens[i];
+				//Utilities.AddLog("Class " + i + " Token:\n" + tmpClass, true);
+
+				string identifier = tmpClass.system.identifier;
+				string className = Localization.LocalizeClass(identifier);
+				string classLevels = tmpClass.system.levels;
+				string hitDice = tmpClass.system.hitDice;
+				string spellcastingAbility = tmpClass.system.spellcasting.ability;
+
+				JToken[] subclasses = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "subclass");
+				string subclassName = "none";
+
+				foreach(JToken scToken in subclasses){
+					//Utilities.AddLog("scToken.Parent: " + scToken.Parent.Parent, true);
+					string subclassIdentifier = ((dynamic)scToken.Parent.Parent).system.classIdentifier;
+
+					if(subclassIdentifier == identifier) {
+						subclassName = scToken.ToString();
+					}
 				}
 
-				fvttCharacter.CreateNewClass(isBase, characterClassesEnNames[i].ToString(), characterClassesLevels[i].ToString());
-				cData = fvttCharacter.classes[characterClassesEnNames[i].ToString()];
+				classHitPointsTmp = JsonHelper.SearchTargetKeysByValue(tmpClass, "value", "HitPoints");
+				if(classHitPointsTmp.Length > 0){
+					classHitPoints = classHitPointsTmp[0];
+				}
+				
+				if (dndSystemVersion != "2.4.0") {
+					classSaves = JsonHelper.SearchTargetKeysByName(tmpClass, "saves")[0];
+				} else {
+					classSaves = JsonHelper.SearchTargetKeysByValue(tmpClass, "grants", "Trait")[0];
+				}
 
-				cData.className = characterClassesRuNames[i].ToString();
-				cData.SetHitDice(characterClassesHitDice[i].ToString());
+				Utilities.AddLog("========================= Class " + i, true);
+				Utilities.AddLog("Name: " + className, true);
+				Utilities.AddLog("Identifier: " + identifier, true);
+				Utilities.AddLog("Levels: " + classLevels, true);
+				Utilities.AddLog("Hit Dice: " + hitDice, true);
+				Utilities.AddLog("Spellcasting Ability: " + spellcastingAbility, true);
+				Utilities.AddLog("Hit Points: " + classHitPoints, true);
+				Utilities.AddLog("Saves: " + classSaves, true);
+				Utilities.AddLog("Subclass: " + subclassName, true);
+
+				isBase = className == baseClassName;
+
+				fvttCharacter.CreateNewClass(isBase, identifier, classLevels);
+				cData = fvttCharacter.classes[identifier];
+
+				cData.className = className;
+				cData.subclassName = subclassName;
+				cData.SetHitDice(hitDice);
 				fvttCharacter.conMod = Utilities.CalcModificator(fvttObject.system.abilities.con.value.ToString());
 
-				int hpIntValue = 0;
-				for (int h = 1; h <= characterClassesHitPoints[i].Count<JToken>(); h++) {
-					//Utilities.AddLog("HP VALUE:" + characterClassesHitPoints[i][h.ToString()]);
+				if(classHitPoints != null){
+					for (int h = 1; h <= classHitPoints.Count<JToken>(); h++) {
+						//Utilities.AddLog("HP VALUE:" + classHitPoints[h.ToString()]);
 
-					if (characterClassesHitPoints[i][h.ToString()].ToString() == "max") {
-						characterClassesHitPoints[i][h.ToString()] = cData.hitDiceValue.ToString();
+						if (classHitPoints[h.ToString()].ToString() == "max") {
+							classHitPoints[h.ToString()] = cData.hitDiceValue.ToString();
+						}
+
+						if (classHitPoints[h.ToString()].ToString() == "avg") {
+							classHitPoints[h.ToString()] = (cData.hitDiceValue / 2 + 1).ToString();
+						}
+
+						int.TryParse(classHitPoints[h.ToString()].ToString(), out hpIntValue);
+						cData.lvlsHP.Add(hpIntValue);
 					}
-
-					if (characterClassesHitPoints[i][h.ToString()].ToString() == "avg") {
-						characterClassesHitPoints[i][h.ToString()] = (cData.hitDiceValue/2 + 1).ToString();
-					}
-
-					int.TryParse(characterClassesHitPoints[i][h.ToString()].ToString(), out hpIntValue);
-					cData.lvlsHP.Add(hpIntValue);
 				}
-
-				foreach (var saveToken in characterClassesSaves[i]) {
-					Utilities.AddLog("Saves TOKEN:" + saveToken);
-
+				
+				foreach (JToken saveToken in classSaves) {
 					if (dndSystemVersion != "2.4.0") {
-						cData.saves.Add(saveToken.ToString());
+						saveString = saveToken.ToString();
 					} else {
-						cData.saves.Add(saveToken.ToString().Substring(6));
+						saveString = saveToken.ToString().Substring(6);
 					}
+
+					cData.saves.Add(saveString);
+
+					Utilities.AddLog("Save TOKEN: " + saveString);
 				}
 
-				cData.spellcastCharacteristic = characterClassesSpellcasting[i]["ability"].ToString();
-			}
-			//Utilities.AddLog("==========================================\n");
-			for (int i = 0; i < fvttCharacter.classes.Count; i++) {
-				cData = fvttCharacter.classes[characterClassesEnNames[i].ToString()];
-				//Utilities.AddLog("cData.className: " + cData.className);
-				//Utilities.AddLog("cData.spellcastCharacteristic: " + cData.spellcastCharacteristic);
+				if(!string.IsNullOrEmpty(spellcastingAbility)){
+					cData.spellcastCharacteristic = spellcastingAbility;
+				}
 
-				if (!string.IsNullOrEmpty(cData.spellcastCharacteristic)){
+				if (cData.spellcastCharacteristic != "none") {
 					cData.spellSave = 8 + fvttCharacter.GetProficiencyBonus() + Utilities.CalcModificator(fvttObject.system.abilities[cData.spellcastCharacteristic].value.ToString());
 					cData.spellAttackBonus = fvttCharacter.GetProficiencyBonus() + Utilities.CalcModificator(fvttObject.system.abilities[cData.spellcastCharacteristic].value.ToString());
 				}
-				//Utilities.AddLog("==========================================Character Data:\n" + JValue.FromObject(fvttCharacter.classes[characterClassesEnNames[i].ToString()]));
+				Utilities.AddLog("=====Prepared character Data:\n" + JValue.FromObject(fvttCharacter.classes[identifier]));
 			}
+
+			//Utilities.doSilent = true;
 
 			// LSS Common
 			newLSSObject = (dynamic) ((JObject) empty_lss_object).DeepClone();
@@ -168,14 +231,14 @@ namespace FVTTtoLSSCharConverter {
 			// LSS Info
 			// Race
 			string race = JsonHelper.SearchTargetKeyByValue(fvttObject, "value", "system.details.race");
-			if (string.IsNullOrEmpty(race)) {
+			if (race == "none") {
 				race = fvttObject.system.details.race;
 			}
 			newLSSObject.info.race.value = race;
 
 			// Background
 			string background = JsonHelper.SearchTargetKeyByValue(fvttObject, "name", "background");
-			if (string.IsNullOrEmpty(background)) {
+			if (background == "none") {
 				background = fvttObject.system.details.background;
 			}
 			newLSSObject.info.background.value = background;
@@ -186,12 +249,13 @@ namespace FVTTtoLSSCharConverter {
 			newLSSObject.info.experience.value = fvttObject.system.details.xp.value;
 
 			// LSS Stats
-			newLSSObject.stats.str.score = fvttObject.system.abilities.str.value;
-			newLSSObject.stats.dex.score = fvttObject.system.abilities.dex.value;
-			newLSSObject.stats.con.score = fvttObject.system.abilities.con.value;
-			newLSSObject.stats["int"].score = fvttObject.system.abilities["int"].value;
-			newLSSObject.stats.wis.score = fvttObject.system.abilities.wis.value;
-			newLSSObject.stats.cha.score = fvttObject.system.abilities.cha.value;
+			newLSSObject.stats.str.score = FindMaximumStatChange(fvttObject, "str");
+			newLSSObject.stats.dex.score = FindMaximumStatChange(fvttObject, "dex");
+			newLSSObject.stats.con.score = FindMaximumStatChange(fvttObject, "con");
+			newLSSObject.stats["int"].score = FindMaximumStatChange(fvttObject, "int");
+			newLSSObject.stats.wis.score = FindMaximumStatChange(fvttObject, "wis");
+			newLSSObject.stats.cha.score = FindMaximumStatChange(fvttObject, "cha");
+
 
 			//Utilities.doSilent = true;
 			// LSS Skills
@@ -256,10 +320,13 @@ namespace FVTTtoLSSCharConverter {
 			newLSSObject.text["notes-3"].customLabel = "ПРЕДЫСТОРИЯ ПЕРСОНАЖА";
 			newLSSObject.text["notes-3"].value.data = fvttObject.system.details.biography.value.ToString();//StripHTML(fvttObject.system.details.biography.value.ToString());
 
-			List<CharacterClassData> casterClasses = fvttCharacter.GetCastClasses();
-			//newLSSObject = AddLineToNotes(newLSSObject, "notes-1", "\n");
+			List<CharacterClassData> casterClasses = fvttCharacter.GetAllClassesList();//.GetCastClassesList();
+			
 			foreach (var cData3 in casterClasses) {
-				newLSSObject = AddLineToNotes(newLSSObject, "notes-1", cData3.GetCasterClassString());
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-1", (cData3.HasSpellAbility) ? cData3.GetCasterClassString() : cData3.GetClassString());
+				if(cData3.classLevel > 3){
+					newLSSObject = AddLineToNotes(newLSSObject, "notes-1", "Архетип: " + cData3.subclassName);
+				}
 			}
 
 			// LSS SubInfo, if tidy5e charlist used!
@@ -293,14 +360,17 @@ namespace FVTTtoLSSCharConverter {
 
 			// LSS Vitality
 			newLSSObject.vitality["hp-current"].value = fvttObject.system.attributes.hp.value;
-			newLSSObject.vitality["hp-max"].value = fvttCharacter.GetMaxHP();
+
+			int calculatedMaxHP = fvttCharacter.GetMaxHP();
+			int fixedMaxHP = (fvttObject.system.attributes.hp.max != null) ? fvttObject.system.attributes.hp.max : fvttObject.system.attributes.hp.value;
+			newLSSObject.vitality["hp-max"].value = (calculatedMaxHP > fixedMaxHP) ? calculatedMaxHP : fixedMaxHP;
+			Utilities.AddLog("Calculated Max HP: " + calculatedMaxHP + " | Fixed Max HP: " + fixedMaxHP, true);
 
 			newLSSObject.vitality["hit-die"].value = fvttCharacter.GetHpDiceString();
 			//Utilities.AddLog("hit-die: " + newLSSObject.vitality["hit-die"].value);
 
 			Dictionary<string, int> hpDicesMulti = fvttCharacter.GetHpDiceMulti();
-
-			newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Кости хитов:");
+			newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "<b>Кости хитов:</b>");
 			foreach (var hpDice in hpDicesMulti) {
 				newLSSObject.vitality["hp-dice-multi"][hpDice.Key].max = hpDice.Value;
 				newLSSObject.vitality["hp-dice-multi"][hpDice.Key].current = hpDice.Value;
@@ -315,7 +385,57 @@ namespace FVTTtoLSSCharConverter {
 			newLSSObject.vitality["hp-dice-current"].value = hpDicesMulti.Count;
 			newLSSObject.vitality["hp-max-bonus"].value = 0;
 
-			newLSSObject.vitality.speed.value = fvttObject.system.attributes.movement.walk; // fly, climb, swim, burrow. Add this to some textbox
+			newLSSObject.vitality.speed.value = fvttObject.system.attributes.movement.walk;
+
+			newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Скорость перемещения:", TextType.Bold, TextSpace.Before);
+			if(fvttObject.system.attributes.movement.walk != null){
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Хотьба: " + fvttObject.system.attributes.movement.walk);
+			}
+			if (fvttObject.system.attributes.movement.fly != null) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Полёт: " + fvttObject.system.attributes.movement.fly);
+			}
+			if (fvttObject.system.attributes.movement.swim != null) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Плавание: " + fvttObject.system.attributes.movement.swim);
+			}
+			if (fvttObject.system.attributes.movement.burrow != null) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Копание: " + fvttObject.system.attributes.movement.burrow);
+			}
+
+			string darkvision = "";
+			string blindsight = "";
+			string tremorsense = "";
+			string truesight = "";
+
+			if (fvttObject.system.attributes.senses.darkvision != null) {
+				darkvision = fvttObject.system.attributes.senses.darkvision;
+			}
+			if (fvttObject.system.attributes.senses.blindsight != null) {
+				blindsight = fvttObject.system.attributes.senses.blindsight;
+			}
+			if (fvttObject.system.attributes.senses.tremorsense != null) {
+				tremorsense = fvttObject.system.attributes.senses.tremorsense;
+			}
+			if (fvttObject.system.attributes.senses.truesight != null) {
+				truesight = fvttObject.system.attributes.senses.truesight;
+			}
+
+			if(!string.IsNullOrEmpty(darkvision) || !string.IsNullOrEmpty(blindsight) || !string.IsNullOrEmpty(tremorsense) || !string.IsNullOrEmpty(truesight)) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Способности:", TextType.Bold, TextSpace.Before);
+			}
+
+			if (!string.IsNullOrEmpty(darkvision)) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Тёмное зрение: " + darkvision);
+			}
+			if (!string.IsNullOrEmpty(blindsight)) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Слепое зрение: " + blindsight);
+			}
+			if (!string.IsNullOrEmpty(tremorsense)) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Чувство вибрации: " + tremorsense);
+			}
+			if (!string.IsNullOrEmpty(truesight)) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Истинное зрение: " + truesight);
+			}
+
 			newLSSObject.vitality.ac.value = "";
 			newLSSObject.vitality.initiative.value = Utilities.CalcModificator(fvttObject.system.abilities.dex.value.ToString());
 
@@ -326,14 +446,14 @@ namespace FVTTtoLSSCharConverter {
 			foreach (var cData2 in fvttCharacter.classes.Values) {
 				if(cData2.baseClass){ 
 					foreach(string save in cData2.saves){
-						Utilities.AddLog(save);
+						Utilities.AddLog("Add Save from base blass: " + save);
 						newLSSObject.saves[save].isProf = true;
 					}
 				}else{
 					continue;	
 				}
 			}
-			Utilities.AddLog(newLSSObject.saves.ToString());
+			//Utilities.AddLog(newLSSObject.saves.ToString());
 
 			// LSS casterClass
 			CharacterClassData casterData = fvttCharacter.FindMainCasterClass(true);
@@ -346,7 +466,7 @@ namespace FVTTtoLSSCharConverter {
 				newLSSObject.spellsInfo.mod.value = casterData.spellAttackBonus;
 
 				Utilities.AddLog("Main Caster Class: " + newLSSObject.casterClass.value);
-				Utilities.AddLog("Spellcast Characteristic: " + newLSSObject.spellsInfo["base"].value);
+				Utilities.AddLog("Spellcast Characteristic: " + newLSSObject.spellsInfo["base"].code);
 				Utilities.AddLog("spellsInfo.save: " + newLSSObject.spellsInfo.save.value);
 				Utilities.AddLog("spellsInfo.mod: " + newLSSObject.spellsInfo.mod.value);
 			}
@@ -389,9 +509,16 @@ namespace FVTTtoLSSCharConverter {
 			newLSSObject.text["traits"].value.data = "";
 			newLSSObject.text["prof"].value.data = "";
 
+			Utilities.AddLog("====================================\n");
+			//Utilities.AddLog(((JToken)fvttObject.items).ToString());
+
+			//JToken[] test = ((JArray)fvttObject.items).ToArray<JToken>();
+			//Utilities.AddLog(((JToken)fvttObject.items).ToString());
+
 			JToken[] characterItemsWeapons = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "weapon");
 			JToken[] characterItemsEquipment = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "equipment");
 			JToken[] characterItemsBackpack = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "backpack");
+			JToken[] characterItemsConsumable = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "consumable");
 			JToken[] characterItemsLoot = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "loot");
 			JToken[] characterItemsTool = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "tool");
 			JToken[] characterItemsFeats = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "feat");
@@ -461,6 +588,15 @@ namespace FVTTtoLSSCharConverter {
 				newLSSObject = AddLineToNotes(newLSSObject, "items", itemName + GetItemQuantity(tmpJson));
 			}
 
+			Utilities.AddLog("==========================================Character Consumable:\n");
+			foreach (var item in characterItemsConsumable) {
+				//Utilities.AddLog(item.ToString());
+				tmpJson = (dynamic)item.Parent.Parent;
+
+				string itemName = SimplifyName(item.ToString());
+				newLSSObject = AddLineToNotes(newLSSObject, "items", itemName + GetItemQuantity(tmpJson));
+			}
+
 			Utilities.AddLog("==========================================Character Tool:\n");
 			foreach (var item in characterItemsTool) {
 				//Utilities.AddLog(item.ToString());
@@ -491,13 +627,13 @@ namespace FVTTtoLSSCharConverter {
 					//Utilities.AddLog(tmpJson.ToString());
 					string featName = SimplifyName(feat.ToString());
 
-					string description = "\n";
+					//string description = "\n";
 					
-					if (tmpJson.system != null) {
-						description += StripHTML(tmpJson.system.description.value.ToString());
-					}else if(!string.IsNullOrEmpty(tmpJson.description.ToString())) {
-						description += StripHTML(tmpJson.description.ToString());
-					}
+					//if (tmpJson.system != null) {
+					//	description += StripHTML(tmpJson.system.description.value.ToString());
+					//}else if(!string.IsNullOrEmpty(tmpJson.system.description.ToString())) {
+					//	description += StripHTML(tmpJson.system.description.ToString());
+					//}
 
 					if(tmpJson.system != null && !string.IsNullOrEmpty(tmpJson.system.uses.max.ToString())){
 						featName = "<b>" + featName + ":</b> " + GetUsesString(tmpJson.system.uses);
@@ -693,6 +829,35 @@ namespace FVTTtoLSSCharConverter {
 			return Regex.Replace(input, "<.*?>", String.Empty);
 		}
 
+		// BUG!!!
+		public static int FindMaximumStatChange(dynamic fvttObject, string key) {
+			JToken[] changesFound = JsonHelper.SearchTargetKeysByValue(fvttObject, "value", "system.abilities." + key + ".value");
+
+			int fvttValue = 0;
+			int.TryParse(fvttObject.system.abilities[key].value.ToString(), out fvttValue);
+
+			int result = 0;
+			int tmpVal = 0;
+			if (changesFound.Length > 0) {
+				foreach (var item in changesFound) {
+					int.TryParse(item.ToString(), out tmpVal);
+
+					if (result < tmpVal)
+						result = tmpVal;
+				}
+			}
+
+			Utilities.AddLog("\n==================STAT COMPARSION:");
+			Utilities.AddLog("fvttValue: " + fvttValue);
+			Utilities.AddLog("result: " + result);
+
+			if (fvttValue > result){
+				return fvttValue;
+			}
+
+			return result;
+		}
+
 		public static string GetSpellModBonus(string characteristic, dynamic fvttObject) {
 			int charMod = Utilities.CalcModificator(fvttObject.system.abilities[characteristic].value.ToString());
 
@@ -738,7 +903,12 @@ namespace FVTTtoLSSCharConverter {
 				result = result.TrimEnd();
 			}
 
-			if(result.Contains(" (")){
+			if(result.Contains("(")){
+				result = result.Remove(result.IndexOf('('));
+				result = result.TrimEnd();
+			}
+
+			if (result.Contains("(")) {
 				result = result.Remove(result.IndexOf('('));
 				result = result.TrimEnd();
 			}

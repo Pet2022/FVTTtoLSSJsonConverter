@@ -46,7 +46,7 @@ namespace FVTTtoLSSCharConverter {
 		public static JToken[] SearchTargetKeysByValue(dynamic jsonObject, string targetSearchKey, string searchValue) {
 			JToken[] tokens = ((JObject)jsonObject).Descendants()
 				.Where(t => t.Type == JTokenType.Property && ((JProperty)t).Value.ToString() == searchValue)
-				.Select(p => p.Parent).Descendants()
+				.Select(p => p.Parent).Descendants()//First<JToken>()
 				.Where(t => t.Type == JTokenType.Property && ((JProperty)t).Name == targetSearchKey)
 				.Select(p => ((JProperty)p).Value)
 				.ToArray();
@@ -65,7 +65,7 @@ namespace FVTTtoLSSCharConverter {
 			string result = defaultValue;
 
 			JToken token = ((JObject)jsonObject).Descendants()
-				.Where(t => t.Type == JTokenType.Property && ((JProperty)t).Name.ToString() == targetSearchKey)
+				.Where(t => t.Type == JTokenType.Property && ((JProperty)t).Name == targetSearchKey)
 				.Select(p => ((JProperty)p).Value)
 				.FirstOrDefault();
 
