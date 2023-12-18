@@ -185,6 +185,14 @@ namespace FVTTtoLSSCharConverter {
 		public List<int> lvlsHP = new List<int>();
 		public List<string> saves = new List<string>();
 
+		public bool HasSubclass {
+			get { return subclassName != "none"; }
+		}
+
+		public bool IsWarlock{ 
+			get { return classNameOriginal == "warlock"; }	
+		}
+
 		public bool HasSpellAbility {
 			get { return (spellcastCharacteristic != "none"); }
 		}
@@ -216,11 +224,31 @@ namespace FVTTtoLSSCharConverter {
 		}
 
 		public string GetCasterClassString() {
-			return className + " " + classLevel + " | Хар-ка: " + Localization.LocalizeCharacteristic(spellcastCharacteristic) + " | Спас: " + spellSave + " | Бонус: " + spellAttackBonus;
+			return "<b>" + className + " " + classLevel + "</b> | Хар-ка: " + Localization.LocalizeCharacteristic(spellcastCharacteristic) + " | Спас: " + spellSave + " | Бонус: " + spellAttackBonus;
 		}
 
 		public string GetClassString() {
-			return className + " " + classLevel;
+			return "<b>" + className + " " + classLevel + "</b>";
+		}
+
+		public string GetWarlockCastDataString(){
+			return "Количество ячеек: " + GetWarlockSpellSlotsCount() + " | Уровень ячеек: " + GetWarlockSpellSlotsLvl();
+		}
+
+		public int GetWarlockSpellSlotsCount(){ 
+			if (classLevel >= 2 && classLevel <= 10) {
+				return 2;
+			} else if (classLevel >= 11 && classLevel <= 16) {
+				return 3;
+			} else if (classLevel >= 17 && classLevel <= 20) {
+				return 4;
+			}
+
+			return 1;
+		}
+
+		public int GetWarlockSpellSlotsLvl() {
+			return (classLevel > 8) ? 5 : (int)Math.Ceiling((double)classLevel / 2);
 		}
 	}
 

@@ -107,6 +107,32 @@ namespace FVTTtoLSSCharConverter {
 			return result;
 		}
 
+		public static int FVTT_GetSkillBonus(dynamic fvttJsonObject, string skillProfKey) {
+			Utilities.AddLog("\n[=== FVTT_GetSkillBonus for Key: " + skillProfKey + " ===]");
+
+			string result = fvttJsonObject.system.skills[skillProfKey].bonuses.check;
+
+			//string result2 = SearchTargetKeyByValue(fvttJsonObject, "value", "system.skills." + skillProfKey + ".bonus");
+
+			//if (result2 != "none" && result.ToString() != result2) {
+			//	return result2;
+			//}
+
+			int tryToInt = 0;
+			int.TryParse(result, out tryToInt);
+
+			if(tryToInt != 0){
+				return tryToInt;	
+			}else if (!string.IsNullOrEmpty(result)){
+				result = result.Remove(result.IndexOf('+'), 1);
+				int.TryParse(result, out tryToInt);
+			}
+
+			Utilities.AddLog("\n=== Try To Int bonus: " + skillProfKey + " ===" + tryToInt);
+
+			return tryToInt;
+		}
+
 		// For debug purposes
 		public static void MakeLSSTemplateFormatted(string filePath, string saveDir) {
 			string text = File.ReadAllText(filePath);

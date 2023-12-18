@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace FVTTtoLSSCharConverter {
 	class Program {
-		private static string appVersion = "v1.0.1";
+		private static string appVersion = "v1.0.2";
 
 		private static string sourceJSONsFolder = "SourceJSONs";
 		private static string outputJSONsFolder = "OutputJSONs";
@@ -23,6 +23,8 @@ namespace FVTTtoLSSCharConverter {
 		private static List<dynamic> lssCharacters = new List<dynamic>();
 
 		private static dynamic newLSSObject;
+
+		private static int dnd240Version = 240000;
 
 		static void Main(string[] args) {
 			Utilities.AddLog("App Version: " + appVersion);
@@ -73,23 +75,24 @@ namespace FVTTtoLSSCharConverter {
 			// Disable debug outputs
 			Utilities.doSilent = true;
 
-			string dndSystemVersion = fvttObject._stats.systemVersion.ToString();
-			Utilities.AddLog("DND System Version: " + dndSystemVersion, true);
+			Utilities.AddLog("DND System Version: " + fvttObject._stats.systemVersion.ToString(), true);
+
+			int dndSystemVersion = ConvertVersionNumber(fvttObject._stats.systemVersion.ToString());
 
 			// Find class, subclass and features imported from plutonium
-			//JToken[] plutoniumItems = JsonHelper.SearchTargetKeysByName(fvttObject, "plutonium");
-			//Utilities.AddLog("Plutonium items found count: " + plutoniumItems.Length, true);
+			JToken[] plutoniumItems = JsonHelper.SearchTargetKeysByName(fvttObject, "plutonium");
+			Utilities.AddLog("Plutonium items found count: " + plutoniumItems.Length, false);
 
-			//bool plutoniumUsed = false;
-			//foreach(var item in plutoniumItems){
-			//	dynamic plutoniumItem = (dynamic)item;
-			//	if (plutoniumItem.page != null && !string.IsNullOrEmpty(plutoniumItem.page.ToString())){
-			//		//Utilities.AddLog("Plutonium item with reference: " + plutoniumItem.page.ToString());
-			//		plutoniumUsed = true;
-			//	}	
-			//}
+			bool plutoniumUsed = false;
+			foreach (var item in plutoniumItems) {
+				dynamic plutoniumItem = (dynamic)item;
+				if (plutoniumItem.page != null && !string.IsNullOrEmpty(plutoniumItem.page.ToString())) {
+					//Utilities.AddLog("Plutonium item with reference: " + plutoniumItem.page.ToString());
+					plutoniumUsed = true;
+				}
+			}
 
-			//Utilities.AddLog("Plutonium used: " + plutoniumUsed, true);
+			Utilities.AddLog("Plutonium used: " + plutoniumUsed, true);
 
 			// Find all class items with hitDice values
 			JToken[] hitDiceTokens = JsonHelper.SearchTargetKeysByName(fvttObject, "hitDice");
@@ -144,7 +147,7 @@ namespace FVTTtoLSSCharConverter {
 					classHitPoints = classHitPointsTmp[0];
 				}
 				
-				if (dndSystemVersion != "2.4.0") {
+				if (dndSystemVersion < dnd240Version) {
 					classSaves = JsonHelper.SearchTargetKeysByName(tmpClass, "saves")[0];
 				} else {
 					classSaves = JsonHelper.SearchTargetKeysByValue(tmpClass, "grants", "Trait")[0];
@@ -188,7 +191,7 @@ namespace FVTTtoLSSCharConverter {
 				}
 				
 				foreach (JToken saveToken in classSaves) {
-					if (dndSystemVersion != "2.4.0") {
+					if (dndSystemVersion < dnd240Version) {
 						saveString = saveToken.ToString();
 					} else {
 						saveString = saveToken.ToString().Substring(6);
@@ -230,10 +233,25 @@ namespace FVTTtoLSSCharConverter {
 
 			// LSS Info
 			// Race
-			string race = JsonHelper.SearchTargetKeyByValue(fvttObject, "value", "system.details.race");
-			if (race == "none") {
-				race = fvttObject.system.details.race;
+
+			// Common
+			string commonRace = fvttObject.system.details.race;
+
+			// Plutonium && dnd < 2.4.0
+			string oldRace = JsonHelper.SearchTargetKeyByValue(fvttObject, "value", "system.details.race");
+
+			// dnd >= 2.4.0
+			string newRace = JsonHelper.SearchTargetKeyByValue(fvttObject, "name", "race");
+
+			string race = "";
+			if(oldRace != "none") {
+				race = oldRace;
+			}else if(newRace != "none"){
+				race = newRace;	
+			}else{
+				race = commonRace;
 			}
+
 			newLSSObject.info.race.value = race;
 
 			// Background
@@ -258,7 +276,7 @@ namespace FVTTtoLSSCharConverter {
 
 
 			//Utilities.doSilent = true;
-			// LSS Skills
+			// LSS Skills proficiency
 			newLSSObject.skills.acrobatics.isProf = JsonHelper.FVTT_GetSkillProf(fvttObject, "acr");
 			newLSSObject.skills.investigation.isProf = JsonHelper.FVTT_GetSkillProf(fvttObject, "inv");
 			newLSSObject.skills.athletics.isProf = JsonHelper.FVTT_GetSkillProf(fvttObject, "ath");
@@ -277,6 +295,26 @@ namespace FVTTtoLSSCharConverter {
 			newLSSObject.skills.stealth.isProf = JsonHelper.FVTT_GetSkillProf(fvttObject, "ste");
 			newLSSObject.skills.persuasion.isProf = JsonHelper.FVTT_GetSkillProf(fvttObject, "per");
 			newLSSObject.skills["animal handling"].isProf = JsonHelper.FVTT_GetSkillProf(fvttObject, "ani");
+
+			// LSS Skills bonus
+			newLSSObject.skills.acrobatics.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "acr");
+			newLSSObject.skills.investigation.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "inv");
+			newLSSObject.skills.athletics.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "ath");
+			newLSSObject.skills.perception.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "prc");
+			newLSSObject.skills.survival.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "sur");
+			newLSSObject.skills.performance.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "prf");
+			newLSSObject.skills.intimidation.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "itm");
+			newLSSObject.skills.history.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "his");
+			newLSSObject.skills["sleight of hand"].bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "slt");
+			newLSSObject.skills.arcana.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "arc");
+			newLSSObject.skills.medicine.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "med");
+			newLSSObject.skills.deception.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "dec");
+			newLSSObject.skills.nature.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "nat");
+			newLSSObject.skills.insight.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "ins");
+			newLSSObject.skills.religion.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "rel");
+			newLSSObject.skills.stealth.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "ste");
+			newLSSObject.skills.persuasion.bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "per");
+			newLSSObject.skills["animal handling"].bonus = JsonHelper.FVTT_GetSkillBonus(fvttObject, "ani");
 
 			// LSS Coins
 			newLSSObject.coins.pp.value = fvttObject.system.currency.pp;
@@ -324,8 +362,12 @@ namespace FVTTtoLSSCharConverter {
 			
 			foreach (var cData3 in casterClasses) {
 				newLSSObject = AddLineToNotes(newLSSObject, "notes-1", (cData3.HasSpellAbility) ? cData3.GetCasterClassString() : cData3.GetClassString());
-				if(cData3.classLevel > 3){
-					newLSSObject = AddLineToNotes(newLSSObject, "notes-1", "Архетип: " + cData3.subclassName);
+				if(cData3.HasSubclass){
+					newLSSObject = AddLineToNotes(newLSSObject, "notes-1", "<b>Архетип:</b> " + cData3.subclassName);
+				}
+
+				if (cData3.IsWarlock) {
+					newLSSObject = AddLineToNotes(newLSSObject, "notes-1", cData3.GetWarlockCastDataString());
 				}
 			}
 
@@ -356,6 +398,13 @@ namespace FVTTtoLSSCharConverter {
 				if (fvttObject.flags["tidy5e-sheet"].notes4.value != null) {
 					newLSSObject = AddLineToNotes(newLSSObject, "notes-6", fvttObject.flags["tidy5e-sheet"].notes4.value.ToString());
 				}
+			}else{
+				newLSSObject.subInfo.age.value = "";
+				newLSSObject.subInfo.height.value = "";
+				newLSSObject.subInfo.weight.value = "";
+				newLSSObject.subInfo.eyes.value = "";
+				newLSSObject.subInfo.skin.value = "";
+				newLSSObject.subInfo.hair.value = "";
 			}
 
 			// LSS Vitality
@@ -385,38 +434,63 @@ namespace FVTTtoLSSCharConverter {
 			newLSSObject.vitality["hp-dice-current"].value = hpDicesMulti.Count;
 			newLSSObject.vitality["hp-max-bonus"].value = 0;
 
-			newLSSObject.vitality.speed.value = fvttObject.system.attributes.movement.walk;
+
+			JToken[] playerRace = JsonHelper.SearchTargetKeysByValue(fvttObject, "name", "race");
+
+			// Movement
+			dynamic movementSource = fvttObject.system.attributes.movement;
+
+			if (playerRace.Length > 0) {
+				//Utilities.AddLog("Player Race:  " + playerRace[0].Parent.Parent, true);
+
+				if (dndSystemVersion >= dnd240Version) {
+					movementSource = ((dynamic)playerRace[0].Parent.Parent).system.movement;
+				}
+			}
+
+			newLSSObject.vitality.speed.value = movementSource.walk;
 
 			newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Скорость перемещения:", TextType.Bold, TextSpace.Before);
-			if(fvttObject.system.attributes.movement.walk != null){
-				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Хотьба: " + fvttObject.system.attributes.movement.walk);
+			if (movementSource.walk != null) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Хотьба: " + movementSource.walk);
 			}
-			if (fvttObject.system.attributes.movement.fly != null) {
-				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Полёт: " + fvttObject.system.attributes.movement.fly);
+			if (movementSource.fly != null) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Полёт: " + movementSource.fly);
 			}
-			if (fvttObject.system.attributes.movement.swim != null) {
-				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Плавание: " + fvttObject.system.attributes.movement.swim);
+			if (movementSource.swim != null) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Плавание: " + movementSource.swim);
 			}
-			if (fvttObject.system.attributes.movement.burrow != null) {
-				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Копание: " + fvttObject.system.attributes.movement.burrow);
+			if (movementSource.burrow != null) {
+				newLSSObject = AddLineToNotes(newLSSObject, "notes-4", "Копание: " + movementSource.burrow);
 			}
 
+			// Senses
 			string darkvision = "";
 			string blindsight = "";
 			string tremorsense = "";
 			string truesight = "";
 
-			if (fvttObject.system.attributes.senses.darkvision != null) {
-				darkvision = fvttObject.system.attributes.senses.darkvision;
+			dynamic sensesSource = fvttObject.system.attributes.senses;
+
+			if (playerRace.Length > 0) {
+				//Utilities.AddLog("Player Race:  " + playerRace[0].Parent.Parent, true);
+
+				if (dndSystemVersion >= dnd240Version) {
+					sensesSource = ((dynamic)playerRace[0].Parent.Parent).system.senses;
+				}
 			}
-			if (fvttObject.system.attributes.senses.blindsight != null) {
-				blindsight = fvttObject.system.attributes.senses.blindsight;
+
+			if (sensesSource.darkvision != null) {
+				darkvision = sensesSource.darkvision;
 			}
-			if (fvttObject.system.attributes.senses.tremorsense != null) {
-				tremorsense = fvttObject.system.attributes.senses.tremorsense;
+			if (sensesSource.blindsight != null) {
+				blindsight = sensesSource.blindsight;
 			}
-			if (fvttObject.system.attributes.senses.truesight != null) {
-				truesight = fvttObject.system.attributes.senses.truesight;
+			if (sensesSource.tremorsense != null) {
+				tremorsense = sensesSource.tremorsense;
+			}
+			if (sensesSource.truesight != null) {
+				truesight = sensesSource.truesight;
 			}
 
 			if(!string.IsNullOrEmpty(darkvision) || !string.IsNullOrEmpty(blindsight) || !string.IsNullOrEmpty(tremorsense) || !string.IsNullOrEmpty(truesight)) {
@@ -481,6 +555,16 @@ namespace FVTTtoLSSCharConverter {
 			newLSSObject.spells["slots-7"].value = fvttObject.system.spells.spell7.value;
 			newLSSObject.spells["slots-8"].value = fvttObject.system.spells.spell8.value;
 			newLSSObject.spells["slots-9"].value = fvttObject.system.spells.spell9.value;
+
+			foreach (var cData3 in casterClasses) {
+				if(cData3.IsWarlock){
+					int currentSpellSlotsCount = 0;
+					int.TryParse(newLSSObject.spells["slots-" + cData3.GetWarlockSpellSlotsLvl()].value.ToString(), out currentSpellSlotsCount);
+					newLSSObject.spells["slots-" + cData3.GetWarlockSpellSlotsLvl()].value = currentSpellSlotsCount + cData3.GetWarlockSpellSlotsCount();
+
+					break;
+				}
+			}
 
 			newLSSObject.text["spells-level-0"].value.data = "";
 			newLSSObject.text["spells-level-1"].value.data = "";
@@ -645,6 +729,8 @@ namespace FVTTtoLSSCharConverter {
 				}
 			}
 
+			//Utilities.doSilent = false;
+
 			Utilities.AddLog("==========================================Character Spells:\n");
 			foreach (var spell in characterItemsSpells) {
 				tmpJson = (dynamic)spell.Parent.Parent;
@@ -652,16 +738,14 @@ namespace FVTTtoLSSCharConverter {
 
 				string itemName = SimplifyName(spell.ToString());
 				bool isPrepared = false;
+				bool isPact = (tmpJson.system.preparation.mode.ToString() == "pact");
 
-				try{
-					Utilities.AddLog("prepared: " + tmpJson.system.preparation.prepared.ToString());
-				
-					if (!string.IsNullOrEmpty(tmpJson.system.preparation.prepared.ToString())){
-						isPrepared = tmpJson.system.preparation.prepared;
-					}
-				}catch(Exception ex){}
+				isPrepared = ((bool)tmpJson.system.preparation.prepared|| tmpJson.system.preparation.mode.ToString() == "pact");
 
-				if(isPrepared){
+				//Utilities.AddLog(itemName + " is pact: " + isPact);
+				//Utilities.AddLog("prepared: " + isPrepared);
+
+				if (isPrepared){
 					string resultLine = "";
 					string spellSaveChar = "";
 
@@ -692,14 +776,19 @@ namespace FVTTtoLSSCharConverter {
 						newLSSObject = AddLineToNotes(newLSSObject, "attacks", resultLine);
 					} else{
 						resultLine = itemName + spellSaveChar;
+
+						if (isPact) {
+							resultLine = "[Пакт] " + resultLine;
+						}
 					}
 
 					Utilities.AddLog(resultLine);
 
-					string spellLevel = tmpJson.system.level.ToString();
-					newLSSObject = AddLineToNotes(newLSSObject, "spells-level-" + spellLevel, itemName + spellSaveChar);
+					newLSSObject = AddLineToNotes(newLSSObject, "spells-level-" + tmpJson.system.level.ToString(), resultLine);
 				}
 			}
+
+			//Utilities.doSilent = true;
 
 			// LSS Proficiencies
 			Utilities.AddLog("\n==========================================Character Proficiencies:");
@@ -771,6 +860,21 @@ namespace FVTTtoLSSCharConverter {
 			// ========================================
 			// Save converted json
 			JsonFileUtils.SimpleWrite(newLSSObject, AppContext.BaseDirectory + outputJSONsFolder + "/actor_" + newLSSObject.name.value + "_lss_converted.json");
+			//JsonHelper.MakeLSSTemplateFormatted(AppContext.BaseDirectory + emptyJSONsFolder + "/" + empty_lss_name, outputJSONsFolder);
+		}
+
+		public static int ConvertVersionNumber(string version){
+			string[] versionArrayString = version.Split('.');
+			int[] versionArrayInt = new int[versionArrayString.Length];
+
+			int resultInt = 0;
+
+			for(int i = 0; i < versionArrayString.Length; i++){
+				int.TryParse(versionArrayString[i], out versionArrayInt[i]);
+				resultInt += (int)(versionArrayInt[i] * 100000/ Math.Pow(10, i));
+			}
+
+			return resultInt;
 		}
 
 		public static string GetUsesString(dynamic usesToken){
